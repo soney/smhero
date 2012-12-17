@@ -52,7 +52,7 @@ var SheetMusicHero = function(options) {
 		var old_target = this.target;
 
 		do {
-			this.target = Note.fromMIDIEvent({1: random_between(41, 83)});
+			this.target = Note.fromMIDIEvent({1: random_between(41, 83)}, {use_accidental: Math.random() > 0.5 ? Note.FLAT : Note.SHARP});
 		} while(this.target.equals(old_target));
 
 		var element = this.option("element");

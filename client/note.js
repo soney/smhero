@@ -30,9 +30,19 @@ var Note = function(options) {
 		var note_id = message[1]%12;
 		var accidental = my.NATURAL;
 
+		var opts = _.extend({
+			value: 4
+			, use_accidental: my.SHARP
+		}, options);
+
 		if(isAccidental(note_id)) {
-			note_id--;
-			accidental = my.SHARP;
+			if(opts.use_accidental === my.FLAT) {
+				note_id++;
+				accidental = my.FLAT;
+			} else {
+				note_id--;
+				accidental = my.SHARP;
+			}
 		}
 
 		var octave = Math.round((message[1]-note_id)/12)-1;
@@ -41,10 +51,11 @@ var Note = function(options) {
 			note_id += 12;
 			octave--;
 		}
+		while(note_id >= 12) {
+			note_id -= 12;
+			octave++;
+		}
 
-		var opts = _.extend({
-			value: 4
-		}, options);
 
 		return new Note({
 			note_id: note_id

@@ -72,7 +72,7 @@ $.widget("smhero.staff_view", {
 		, x: 1
 		, staff_width: 90
 		, width: 200 
-		, height: 100
+		, height: 400
 		, scale: 1
 		, treble_staff_y: 7 
 		, clef_x: 10
@@ -146,10 +146,11 @@ $.widget("smhero.staff_view", {
 
 	, update_staff: function() {
 		this.bass_clef.attr({
-			 transform:	"t" + (this.option("x") + this.option("clef_x")) + "," + this.option("y")
+			 transform:
+							"t-230.9546,-533.6597"
+							+ "t" + (this.option("x") + this.option("clef_x")) + "," + this.option("y")
 							+ "s"+this.option("scale")+","+this.option("scale")+",0,0"
 							+ "t0," + (treble_clef_height + treble_clef_spacing)
-							+ "t-230.9546,-533.6597"
 		});
 		this.treble_clef.attr({
 			transform:	"t" + (this.option("x") + this.option("clef_x")) + "," + this.option("y")
@@ -159,19 +160,22 @@ $.widget("smhero.staff_view", {
 		var treble_path = "";
 		var bass_path = "";
 
-		var bass_start = treble_clef_height + treble_clef_spacing;
-		var treble_start = this.option("treble_staff_y");
+		var scale = this.option("scale");
+		var bass_start = this.option("y") + treble_clef_height + treble_clef_spacing;
+		var treble_start = this.option("y") + this.option("treble_staff_y");
 
-		var start_x = 0;
-		var end_x = this.option("staff_width");
+		var start_x = this.option("scale") * this.option("x");
+		var end_x = this.option("scale") * (this.option("x") + this.option("staff_width"));
+
 		for(var i = 0; i<5; i++) {
-			treble_path += "M" + start_x + "," + (treble_start + (i*spacing)) + " H" + end_x;
-			bass_path += "M" + start_x + "," + (bass_start + (i*spacing)) + " H" + end_x;
+			treble_path += "M" + start_x + "," + (this.option("scale") * (treble_start + (i*spacing))) + " H" + end_x;
+			bass_path += "M" + start_x + "," + (this.option("scale") * (bass_start + (i*spacing))) + " H" + end_x;
 		}
-		treble_path += "M" + start_x + "," + treble_start + "V" + (treble_start + 4 * spacing)
+		treble_path += "M" + (scale * start_x) + "," + (scale*treble_start) + "V" + (scale * (treble_start + 4 * spacing))
 		bass_path += "M" + start_x + "," + bass_start + "V" + (bass_start + 4 * spacing)
 		this.treble_staff.attr("path", treble_path);
 		this.bass_staff.attr("path", bass_path);
+		/*
 		this.treble_staff.attr({
 			transform: "s"+this.option("scale")+","+this.option("scale")+",0,0"
 						+ "t"+this.option("x")+","+this.option("y")
@@ -180,6 +184,7 @@ $.widget("smhero.staff_view", {
 			transform: "s"+this.option("scale")+","+this.option("scale")+",0,0"
 						+ "t"+this.option("x")+","+this.option("y")
 		});
+		*/
 		this.paper.setSize(this.get_width(), this.option("y") + this.get_height());
 	}
 

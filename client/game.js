@@ -26,17 +26,20 @@ var SheetMusicHero = function(options) {
 	});
 	this.update_target();
 
-	midi_client.on("note_change", _.bind(function(notes, removed, added, modified) {
-		_.each(removed, function(note) {
+	midi_client.on("note_change", _.bind(function(note_info, removed, added, modified) {
+		_.each(removed, function(note_info) {
+			var note = note_info.note;
 			element.staff_view("remove_note", note);
-			if(note.id === this.target) {
+			if(note.equals(this.target)) {
 				this.on_note_hit(note);
 			}
 		}, this);
-		_.each(added, function(note) {
-			element.staff_view("show_note", note, undefined, {fill: "#777", "fill-opacity": 0.5});
-			if(note.id === this.target) {
+		_.each(added, function(note_info) {
+			var note = note_info.note;
+			if(note.equals(this.target)) {
 				this.on_note_hit(note);
+			} else {
+				element.staff_view("show_note", note, {fill: "#777", "fill-opacity": 0.5, animated: true});
 			}
 		}, this);
 	}, this));
@@ -47,15 +50,18 @@ var SheetMusicHero = function(options) {
 	able.make_proto_optionable(proto);
 	proto.update_target = function() {
 		var old_target = this.target;
-		if(old_target) { }
-		this.target = random_between(41, 83);
+
+		do {
+			this.target = Note.fromMIDIEvent({1: random_between(41, 83)});
+		} while(this.target.equals(old_target));
+
 		var element = this.option("element");
-		element.staff_view("show_note", {id: this.target}, Math.random() > 0.5 ? "flat" : "sharp", {fill: "red"});
+		element.staff_view("show_note", this.target, {fill: "red"});
 		this.target_show_time = get_time();
 	};
 	proto.on_note_hit = function(note) {
 		var element = this.option("element");
-		element.staff_view("remove_note", note);
+		element.staff_view("remove_note", note, {animated: true});
 		this.show_encouragement();
 		this.target_response_times.push(get_time() - this.target_show_time);
 		this.response_time.attr("text", this.get_response_time_str());

@@ -3,8 +3,67 @@ var clef_width = 17;
 var clef_spacing = 5;
 var treble_clef_height = 43;
 var bass_clef_height = 22;
-var treble_clef_spacing = 10;
 var spacing = treble_clef_height/7;
+
+var treble_clef_spacing = 1*spacing;
+
+var index_where = function(arr, obj, eq_check) {
+	for(var i = 0; i<arr.length; i++) {
+		if(eq_check(obj, arr[i])) { return i; }
+	}
+	return -1;
+};
+var eqeqeq = function(a,b) { return a === b; };
+var simple_map = function(eq_check) {
+	eq_check = eq_check || eqeqeq;
+    var keys = [];
+    var values = [];
+    return {
+        set: function(key, value) {
+            var key_index = index_where(keys, key, eq_check);
+            if(key_index < 0) {
+                keys.push(key);
+                values.push(value);
+            } else {
+                values[key_index] = value;
+            }
+        }
+        , unset: function(key) {
+            var key_index = index_where(keys, key, eq_check);
+            while(key_index >= 0) {
+                keys.splice(key_index, 1);
+                values.splice(key_index, 1);
+                key_index = _.indexOf(keys, key);
+            }
+
+        }
+        , get: function(key) {
+            var key_index = index_where(keys, key, eq_check);
+            if(key_index >= 0) {
+                return values[key_index];
+            }
+        }
+        , each: function(callback, context) {
+            context = context || this;
+            for(var i = 0; i<keys.length; i++) {
+                var key = keys[i], value = values[i];
+                callback.call(context, value, key, i);
+            }
+        }
+		, has: function(key) {
+            var key_index = index_where(keys, key, eq_check);
+			return key_index >= 0;
+		}
+    };
+};
+
+var note_eq_check = function(a, b) {
+	if(a instanceof Note && b instanceof Note) {
+		return a.equals(b);
+	} else {
+		return a === b;
+	}
+};
 
 $.widget("smhero.staff_view", {
 	
@@ -15,12 +74,13 @@ $.widget("smhero.staff_view", {
 		, width: 200 
 		, height: 100
 		, scale: 1
+		, treble_staff_y: 7 
 		, clef_x: 10
 		, paper: null
 	}
 
 	, _create: function() {
-		this.note_displays = {};
+		this.note_displays = simple_map(note_eq_check);
 		this.paper = this.option("paper");
 		this.treble_clef = this.paper.path(paths.treble_clef).attr({
 			stroke: "none"
@@ -46,18 +106,33 @@ $.widget("smhero.staff_view", {
 		this.paper.remove();
 	}
 
-	, show_note: function(note, flat_sharp, options) {
-		var staff = note.id >= 60 ? "treble" : "bass";
-		var path = this.get_note_path("quarter", staff, note.id, flat_sharp, options);
+	, show_note: function(note, options) {
+		var staff = note.getStaffLocation() >= 28 ? "treble" : "bass";
+		var path = this.get_note_path(staff, note, options);
 
 		this.remove_note(note);
-		this.note_displays[note.id] = path;
+		this.note_displays.set(note, path);
 	}
 	, remove_note: function(note, options) {
-		if(this.note_displays[note.id]) {
-			var path = this.note_displays[note.id];
-			path.remove();
-			delete this.note_displays[note.id];
+		options = _.extend({animated: false}, options);
+		var path = this.note_displays.get(note);
+		if(path) {
+			this.note_displays.unset(note);
+			if(options.animated) {
+				path.animate({
+					opacity: 0
+				}, 100, "ease-in");
+				path.forEach(function(el) {
+					el.animate({
+						transform: el.attr("transform") + "r10,0,0"
+					}, 100, "ease-in");
+				});
+				window.setTimeout(function() {
+					path.remove();
+				}, 100);
+			} else {
+				path.remove();
+			}
 		}
 	}
 	
@@ -85,7 +160,7 @@ $.widget("smhero.staff_view", {
 		var bass_path = "";
 
 		var bass_start = treble_clef_height + treble_clef_spacing;
-		var treble_start = 7;
+		var treble_start = this.option("treble_staff_y");
 
 		var start_x = 0;
 		var end_x = this.option("staff_width");
@@ -116,72 +191,58 @@ $.widget("smhero.staff_view", {
 		return this.option("height");
 	}
 
-	, get_note_path: function(note_type, staff, note_id, sharp_or_flat, options) {
-		sharp_or_flat = sharp_or_flat || "sharp";
-		if(note_type === "quarter") {
-			var note_location_id = note_id;
-
-			var id_mod_12 = note_id%12;
-			var key = (note_id - id_mod_12)/12;
-
-			var note_location_id = key * 7;
-			for(var i = 0; i<id_mod_12; i++) {
-				var is_black_key = _.indexOf([1,3,6,8,10], i) >= 0;
-				if(!is_black_key) {
-					note_location_id++;
-				}
-			}
-			var is_black_key = _.indexOf([1,3,6,8,10], id_mod_12) >= 0;
-			if(is_black_key && sharp_or_flat === "sharp") {
-				note_location_id--;
-			}
+	, get_note_path: function(staff, note, options) {
+		if(note.getValue() === 4) {
+			var note_location = note.getStaffLocation();
 
 			var note_location_base;
-			var note_location_multiplier = -3;
-			var treble_note_location_base = this.option("y") + 142.5;
+			var note_location_multiplier = -(spacing/2);
+
+
+			var treble_note_location_base = this.option("y") + this.option("treble_staff_y");
+			var bass_note_location_base = this.option("y") + treble_clef_height + treble_clef_spacing;
+
 			var lines_path = "";
 			var note_x = (this.option("x") + this.option("clef_x") + clef_width + clef_spacing);
 			var note_y;
-			var line_spacing = 5;
+			var line_h_spacing = 5;
 			if(staff === "treble") {
-				note_location_base = treble_note_location_base;
-				note_y = note_location_base + note_location_multiplier*note_location_id;
-				if(note_location_id <= 40) {
+				note_y = treble_note_location_base + note_location_multiplier*(note_location-38);
+				if(note_location <= 33) {
 					path_type = "a";
 				} else {
 					path_type = "d";
 				}
-				if(note_location_id <= 35) {
-					var y = 47.5;
+				if(note_location <= 28) {
+					var y = treble_note_location_base + 5*spacing;
 					while(y < note_y+1) {
-						lines_path += "M"+(note_x-line_spacing)+","+y+"H"+(note_x+line_spacing);
+						lines_path += "M"+(note_x-line_h_spacing)+","+y+"H"+(note_x+line_h_spacing);
 						y += spacing;
 					}
-				} else if(note_location_id >= 47) {
-					var y = 47.5 - 5*spacing;
-					while(y > note_y+1) {
-						lines_path += "M"+(note_x-line_spacing)+","+y+"H"+(note_x+line_spacing);
+				} else if(note_location >= 40) {
+					var y = treble_note_location_base - 1*spacing;
+					while(y > note_y-1) {
+						lines_path += "M"+(note_x-line_h_spacing)+","+y+"H"+(note_x+line_h_spacing);
 						y -= spacing;
 					}
 				}
 			} else {
-				note_location_base = treble_note_location_base  + treble_clef_spacing;
-				note_y = note_location_base + note_location_multiplier*note_location_id;
-				if(note_location_id <= 28) {
+				note_y = bass_note_location_base + note_location_multiplier*(note_location-26);
+				if(note_location <= 21) {
 					path_type = "a";
 				} else {
 					path_type = "d";
 				}
-				if(note_location_id <= 23) {
-					var y = 87.5;
+				if(note_location <= 16) {
+					var y = bass_note_location_base + 5*spacing;
 					while(y < note_y+1) {
-						lines_path += "M"+(note_x-line_spacing)+","+y+"H"+(note_x+line_spacing);
+						lines_path += "M"+(note_x-line_h_spacing)+","+y+"H"+(note_x+line_h_spacing);
 						y += spacing;
 					}
-				} else if(note_location_id >= 35) {
-					var y = 87.5 -5*spacing;
+				} else if(note_location >= 28) {
+					var y = bass_note_location_base - 1*spacing;
 					while(y > note_y-1) {
-						lines_path += "M"+(note_x-line_spacing)+","+y+"H"+(note_x+line_spacing);
+						lines_path += "M"+(note_x-line_h_spacing)+","+y+"H"+(note_x+line_h_spacing);
 						y -= spacing;
 					}
 				}
@@ -207,18 +268,12 @@ $.widget("smhero.staff_view", {
 			var note_path = this.paper.path(path_str).attr(opts);
 			var lines = this.paper.path(lines_path);
 
-			var sharp_flat_text = "";
-			if(is_black_key) {
-				if(sharp_or_flat === "sharp") {
-					sharp_flat_text = "#";
-				} else {
-					sharp_flat_text = "b";
-				}
-			}
+			var sharp_flat_text = note.getAccidentalName();
 
-			var marking = this.paper.text(note_x + line_spacing+2, note_y, sharp_flat_text)
+			var marking = this.paper.text(note_x + 7, note_y, sharp_flat_text)
 									.attr({
 										fill: opts.fill
+										, "text-align": "start"
 									});
 
 			var set = this.paper.set();
@@ -227,34 +282,6 @@ $.widget("smhero.staff_view", {
 			set.push(marking);
 			return set;
 		}
-	}
-});
-
-$.widget("smhero.note_view", {
-	
-	options: {
-		type: "quarter"
-	}
-
-	, _create: function() {
-	}
-	
-	, _destroy: function() {
-		this.treble_staff.remove();
-		this.bass_staff.remove();
-		this.treble_clef.remove();
-		this.bass_clef.remove();
-		this.paper.remove();
-	}
-	
-	// _setOptions is called with a hash of all options that are changing
-	// always refresh when changing options
-	, _setOptions: function() {
-		// _super and _superApply handle keeping the right this-context
-		this._superApply(arguments);
-	}
-
-	, update_staff: function() {
 	}
 });
 
